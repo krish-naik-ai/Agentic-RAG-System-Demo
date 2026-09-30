@@ -42,3 +42,35 @@ class RetrievedChunk(BaseModel):
 
     chunk: DocumentChunk
     score: float
+
+
+class RetrievalPlan(BaseModel):
+    """The agent's decision about whether and how to retrieve evidence."""
+
+    model_config = ConfigDict(frozen=True)
+
+    needs_retrieval: bool
+    query: str | None = None
+
+
+class Citation(BaseModel):
+    """Source metadata exposed with an agent answer."""
+
+    model_config = ConfigDict(frozen=True)
+
+    label: str
+    source: str
+    chunk_id: str
+    page: int | None = None
+    score: float
+
+
+class AgentResponse(BaseModel):
+    """Answer and retrieval trace returned to callers."""
+
+    model_config = ConfigDict(frozen=True)
+
+    answer: str
+    retrieval_used: bool
+    retrieval_query: str | None = None
+    citations: list[Citation] = Field(default_factory=list)
