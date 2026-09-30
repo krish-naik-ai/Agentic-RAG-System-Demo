@@ -46,3 +46,19 @@ def ensure_citation_labels(answer: str, citations: list[Citation]) -> str:
         return answer
     labels = " ".join(f"[{citation.label}]" for citation in citations)
     return f"{answer}\n\nSources: {labels}"
+
+
+def strip_citation_labels(answer: str) -> str:
+    """Remove source labels from an answer generated without evidence."""
+
+    return re.sub(r"\s*\[S\d+\]", "", answer).strip()
+
+
+def filter_relevant_hits(
+    hits: list[RetrievedChunk],
+    *,
+    minimum_relevance: float,
+) -> list[RetrievedChunk]:
+    """Discard retrieval results below the configured relevance threshold."""
+
+    return [hit for hit in hits if hit.score >= minimum_relevance]

@@ -29,3 +29,29 @@ def test_naive_rag_always_queries_with_original_question() -> None:
     assert response.retrieval_query == "What is grounded?"
     assert response.citations[0].source == "source.txt"
     assert "[S1]" in response.answer
+
+
+def test_naive_rag_rejects_hits_below_minimum_relevance() -> None:
+    vector_store = StubVectorStore(
+        [
+            RetrievedChunk(
+                chunk=DocumentChunk(
+                    chunk_id="chunk-1",
+                    text="Unrelated evidence.",
+                    source="source.txt",
+                    chunk_index=0,
+                ),
+                score=0.19,
+            )
+        ]
+    )
+    baseline = NaiveRAG(
+        language_model=ScriptedLanguageModel([]),
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=vector_store,
+    )
+
+    response = baseline.answer("What was the company's revenue?")
+
+    assert response.citations == []
+    assert "could not find relevant evidence" in response.answer

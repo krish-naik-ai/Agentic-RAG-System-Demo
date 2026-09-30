@@ -64,6 +64,7 @@ def test_skips_retrieval_for_conversational_question() -> None:
     assert response.citations == []
     assert len(language_model.prompts) == 2
     assert vector_store.last_embedding is None
+    assert "Available document chunks: 0" in language_model.prompts[0][1]
 
 
 def test_reports_missing_evidence_without_generation_call() -> None:
@@ -98,6 +99,42 @@ def test_adds_source_labels_when_model_omits_them() -> None:
     response = agent.answer("How does retrieval work?")
 
     assert response.answer.endswith("Sources: [S1]")
+
+
+def test_removes_source_labels_from_no_retrieval_answer() -> None:
+    agent = RetrievalAgent(
+        language_model=ScriptedLanguageModel(
+            [
+                '{"needs_retrieval": false, "query": null}',
+                "Hello! [S1]",
+            ]
+        ),
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=StubVectorStore([]),
+    )
+
+    response = agent.answer("Hello")
+
+    assert response.answer == "Hello!"
+    assert response.citations == []
+
+
+def test_rejects_hits_below_minimum_relevance() -> None:
+    weak_hit = _retrieval_hit().model_copy(update={"score": 0.19})
+    language_model = ScriptedLanguageModel(
+        ['{"needs_retrieval": true, "query": "company revenue"}']
+    )
+    agent = RetrievalAgent(
+        language_model=language_model,
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=StubVectorStore([weak_hit]),
+    )
+
+    response = agent.answer("What was the company's revenue?")
+
+    assert response.citations == []
+    assert "could not find relevant evidence" in response.answer
+    assert len(language_model.prompts) == 1
 
 
 def test_rejects_invalid_planner_output() -> None:

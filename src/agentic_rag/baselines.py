@@ -6,6 +6,7 @@ from agentic_rag.generation import (
     build_answer_prompt,
     citations_from_hits,
     ensure_citation_labels,
+    filter_relevant_hits,
 )
 from agentic_rag.llm import LanguageModel
 from agentic_rag.models import AgentResponse
@@ -22,13 +23,17 @@ class NaiveRAG:
         embeddings: EmbeddingProvider,
         vector_store: VectorStore,
         retrieval_limit: int = 5,
+        minimum_relevance: float = 0.2,
     ) -> None:
         if retrieval_limit <= 0:
             raise ValueError("retrieval_limit must be positive")
+        if not -1.0 <= minimum_relevance <= 1.0:
+            raise ValueError("minimum_relevance must be between -1 and 1")
         self._language_model = language_model
         self._embeddings = embeddings
         self._vector_store = vector_store
         self._retrieval_limit = retrieval_limit
+        self._minimum_relevance = minimum_relevance
 
     def answer(self, question: str) -> AgentResponse:
         question = question.strip()
@@ -38,7 +43,10 @@ class NaiveRAG:
         query_vectors = self._embeddings.embed([question])
         if len(query_vectors) != 1:
             raise ValueError("The embedding provider must return one query embedding")
-        hits = self._vector_store.query(query_vectors[0], limit=self._retrieval_limit)
+        hits = filter_relevant_hits(
+            self._vector_store.query(query_vectors[0], limit=self._retrieval_limit),
+            minimum_relevance=self._minimum_relevance,
+        )
         if not hits:
             return AgentResponse(
                 answer="I could not find relevant evidence in the uploaded documents.",
