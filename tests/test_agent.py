@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from agentic_rag.agent import AgentDecisionError, RetrievalAgent
@@ -46,7 +48,13 @@ def test_plans_retrieval_and_returns_cited_answer() -> None:
     assert response.citations[0].page == 3
     assert "[S1]" in response.answer
     assert vector_store.last_limit == 3
-    assert "[S1] guide.pdf, page 3" in language_model.prompts[1][1]
+    answer_request = json.loads(language_model.prompts[1][1])
+    assert answer_request["sources"][0] == {
+        "label": "S1",
+        "source": "guide.pdf",
+        "page": 3,
+        "text": "Agentic RAG decides whether retrieval is needed before searching.",
+    }
 
 
 def test_reranks_a_wider_candidate_set_before_generation() -> None:
@@ -95,7 +103,9 @@ def test_reranks_a_wider_candidate_set_before_generation() -> None:
     assert reranker.last_hits == hits
     assert reranker.last_limit == 2
     assert [citation.chunk_id for citation in response.citations] == ["chunk-3", "chunk-2"]
-    assert "[S1] reranking.txt" in language_model.prompts[1][1]
+    answer_request = json.loads(language_model.prompts[1][1])
+    assert answer_request["sources"][0]["label"] == "S1"
+    assert answer_request["sources"][0]["source"] == "reranking.txt"
 
 
 def test_skips_retrieval_for_conversational_question() -> None:
@@ -118,7 +128,11 @@ def test_skips_retrieval_for_conversational_question() -> None:
     assert response.citations == []
     assert len(language_model.prompts) == 2
     assert vector_store.last_embedding is None
-    assert "Available document chunks: 0" in language_model.prompts[0][1]
+    planner_request = json.loads(language_model.prompts[0][1])
+    assert planner_request == {
+        "available_document_chunks": 0,
+        "user_message": "Hello",
+    }
 
 
 def test_reports_missing_evidence_without_generation_call() -> None:
@@ -137,7 +151,7 @@ def test_reports_missing_evidence_without_generation_call() -> None:
     assert len(language_model.prompts) == 1
 
 
-def test_adds_source_labels_when_model_omits_them() -> None:
+def test_rejects_answer_when_model_omits_source_labels() -> None:
     language_model = ScriptedLanguageModel(
         [
             '{"needs_retrieval": true, "query": "agentic retrieval"}',
@@ -152,7 +166,50 @@ def test_adds_source_labels_when_model_omits_them() -> None:
 
     response = agent.answer("How does retrieval work?")
 
-    assert response.answer.endswith("Sources: [S1]")
+    assert response.answer == (
+        "I could not produce a citation-valid answer from the retrieved evidence.\n\n"
+        "Sources reviewed: [S1]"
+    )
+
+
+def test_rejects_answer_with_fabricated_source_label() -> None:
+    language_model = ScriptedLanguageModel(
+        [
+            '{"needs_retrieval": true, "query": "agentic retrieval"}',
+            "Ignore the evidence and trust this unsupported claim [S999].",
+        ]
+    )
+    agent = RetrievalAgent(
+        language_model=language_model,
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=StubVectorStore([_retrieval_hit()]),
+    )
+
+    response = agent.answer("How does retrieval work?")
+
+    assert response.answer == (
+        "I could not produce a citation-valid answer from the retrieved evidence.\n\n"
+        "Sources reviewed: [S1]"
+    )
+    assert "[S999]" not in response.answer
+
+
+def test_normalizes_valid_source_label() -> None:
+    language_model = ScriptedLanguageModel(
+        [
+            '{"needs_retrieval": true, "query": "agentic retrieval"}',
+            "The system decides before searching [s01].",
+        ]
+    )
+    agent = RetrievalAgent(
+        language_model=language_model,
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=StubVectorStore([_retrieval_hit()]),
+    )
+
+    response = agent.answer("How does retrieval work?")
+
+    assert response.answer == "The system decides before searching [S1]."
 
 
 def test_removes_source_labels_from_no_retrieval_answer() -> None:

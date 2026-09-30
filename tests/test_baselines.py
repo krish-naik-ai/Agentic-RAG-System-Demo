@@ -55,3 +55,30 @@ def test_naive_rag_rejects_hits_below_minimum_relevance() -> None:
 
     assert response.citations == []
     assert "could not find relevant evidence" in response.answer
+
+
+def test_naive_rag_rejects_fabricated_source_label() -> None:
+    vector_store = StubVectorStore(
+        [
+            RetrievedChunk(
+                chunk=DocumentChunk(
+                    chunk_id="chunk-1",
+                    text="Grounded evidence.",
+                    source="source.txt",
+                    chunk_index=0,
+                ),
+                score=0.9,
+            )
+        ]
+    )
+    baseline = NaiveRAG(
+        language_model=ScriptedLanguageModel(["Unsupported claim [S2]."]),
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=vector_store,
+    )
+
+    response = baseline.answer("What is grounded?")
+
+    assert "citation-valid answer" in response.answer
+    assert "[S2]" not in response.answer
+    assert response.answer.endswith("Sources reviewed: [S1]")
