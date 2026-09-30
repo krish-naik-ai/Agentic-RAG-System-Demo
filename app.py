@@ -1,5 +1,6 @@
 """Streamlit entrypoint for the Agentic RAG demo."""
 
+import logging
 import os
 from dataclasses import dataclass
 from hashlib import sha256
@@ -23,6 +24,8 @@ DATA_DIRECTORY = Path("data")
 UPLOAD_DIRECTORY = DATA_DIRECTORY / "uploads"
 VECTOR_DIRECTORY = DATA_DIRECTORY / "chroma"
 MODEL_DIRECTORY = DATA_DIRECTORY / "models"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -233,8 +236,9 @@ with st.sidebar:
             )
             with st.spinner("Reading, chunking, and embedding…"):
                 result = services.ingestor.ingest(path)
-        except (APIError, OSError, ValueError) as error:
-            st.error(str(error))
+        except (APIError, OSError, ValueError):
+            logger.exception("Document ingestion failed")
+            st.error("Unable to ingest this document. Please try again.")
         else:
             st.session_state["active_document"] = result.source
             st.success(f"Stored {result.chunk_count} chunks from {result.source}")
@@ -285,8 +289,9 @@ if prompt:
         started_at = perf_counter()
         try:
             response = services.agent.answer(prompt)
-        except (APIError, RuntimeError, ValueError) as error:
-            st.error(f"Unable to answer: {error}")
+        except (APIError, RuntimeError, ValueError):
+            logger.exception("Answer generation failed")
+            st.error("Unable to answer this question. Please try again.")
         else:
             latency_ms = (perf_counter() - started_at) * 1_000
             render_answer(response, latency_ms)
