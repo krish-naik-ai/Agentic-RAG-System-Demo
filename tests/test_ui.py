@@ -6,7 +6,21 @@ import pytest
 from agentic_rag.ingestion_limits import DEFAULT_INGESTION_LIMITS
 from agentic_rag.loaders import UnsupportedDocumentError
 from agentic_rag.models import Citation
-from agentic_rag.ui import format_citation, save_uploaded_document
+from agentic_rag.ui import format_citation, save_uploaded_document, session_data_directory
+
+
+def test_session_data_directory_isolates_generated_namespaces(tmp_path: Path) -> None:
+    first = session_data_directory(tmp_path, "a" * 32)
+    second = session_data_directory(tmp_path, "b" * 32)
+
+    assert first == tmp_path / ("a" * 32)
+    assert second == tmp_path / ("b" * 32)
+    assert first != second
+
+
+def test_session_data_directory_rejects_external_path() -> None:
+    with pytest.raises(ValueError, match="Invalid session namespace"):
+        session_data_directory(Path("data"), "../../shared")
 
 
 def test_save_uploaded_document_uses_safe_basename(tmp_path: Path) -> None:

@@ -45,3 +45,20 @@ def test_rejects_embedding_count_mismatch(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="exactly one embedding"):
         vector_store.replace([chunk], [])
+
+
+def test_separate_persist_paths_do_not_share_chunks(tmp_path: Path) -> None:
+    embeddings = KeywordEmbeddingProvider()
+    first_store = ChromaVectorStore(tmp_path / "sessions" / "first")
+    second_store = ChromaVectorStore(tmp_path / "sessions" / "second")
+    chunk = DocumentChunk(
+        chunk_id="private",
+        text="Session-private retrieval evidence.",
+        source="private.txt",
+        chunk_index=0,
+    )
+
+    first_store.replace([chunk], embeddings.embed([chunk.text]))
+
+    assert first_store.count() == 1
+    assert second_store.count() == 0

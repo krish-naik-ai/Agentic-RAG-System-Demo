@@ -1,5 +1,6 @@
 """Pure helpers used by the Streamlit interface."""
 
+import re
 from pathlib import Path
 
 from agentic_rag.ingestion_limits import (
@@ -11,6 +12,15 @@ from agentic_rag.loaders import UnsupportedDocumentError
 from agentic_rag.models import Citation
 
 SUPPORTED_UPLOAD_SUFFIXES = {".docx", ".md", ".pdf", ".txt"}
+_SESSION_NAMESPACE_PATTERN = re.compile(r"[0-9a-f]{32}")
+
+
+def session_data_directory(base_directory: Path, session_namespace: str) -> Path:
+    """Return an isolated data directory for an application-generated session ID."""
+
+    if _SESSION_NAMESPACE_PATTERN.fullmatch(session_namespace) is None:
+        raise ValueError("Invalid session namespace")
+    return base_directory / session_namespace
 
 
 def save_uploaded_document(

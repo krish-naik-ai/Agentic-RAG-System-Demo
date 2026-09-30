@@ -7,6 +7,7 @@ from hashlib import sha256
 from pathlib import Path
 from time import perf_counter
 from typing import Literal, TypedDict, cast
+from uuid import uuid4
 
 import streamlit as st
 from openai import APIError, OpenAI
@@ -15,10 +16,10 @@ from agentic_rag.agent import RetrievalAgent
 from agentic_rag.embeddings import OpenAIEmbeddingProvider
 from agentic_rag.ingestion import DocumentIngestor
 from agentic_rag.ingestion_limits import DEFAULT_INGESTION_LIMITS
-from agentic_rag.llm import create_language_model, required_api_keys
+from agentic_rag.llm import LanguageModel, create_language_model, required_api_keys
 from agentic_rag.models import AgentResponse
 from agentic_rag.reranking import FlashRankReranker
-from agentic_rag.ui import format_citation, save_uploaded_document
+from agentic_rag.ui import format_citation, save_uploaded_document, session_data_directory
 from agentic_rag.vector_store import ChromaVectorStore
 
 DATA_DIRECTORY = Path("data")
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AppServices:
-    """Long-lived application dependencies."""
+    """Session-isolated application dependencies."""
 
     ingestor: DocumentIngestor
     agent: RetrievalAgent
@@ -40,7 +41,7 @@ class AppServices:
 
 @dataclass(frozen=True)
 class ServiceCacheKey:
-    """Configuration that determines reusable application services."""
+    """Configuration that determines reusable shared model services."""
 
     llm_provider: str
     llm_model: str
@@ -59,13 +60,13 @@ class ChatMessage(TypedDict):
 
 
 @st.cache_resource
-def build_services(
+def build_shared_services(
     cache_key: ServiceCacheKey,
     *,
     _openai_api_key: str,
     _gemini_api_key: str,
-) -> AppServices:
-    """Create shared embedding, language model, and local Chroma adapters."""
+) -> tuple[OpenAIEmbeddingProvider, LanguageModel, FlashRankReranker]:
+    """Create process-wide model adapters that do not hold user documents."""
 
     embeddings = OpenAIEmbeddingProvider(client=OpenAI(api_key=_openai_api_key))
     language_model_environment = {
@@ -76,8 +77,21 @@ def build_services(
     if _gemini_api_key:
         language_model_environment["GEMINI_API_KEY"] = _gemini_api_key
     language_model = create_language_model(language_model_environment)
-    vector_store = ChromaVectorStore(VECTOR_DIRECTORY)
     reranker = FlashRankReranker(MODEL_DIRECTORY)
+    return embeddings, language_model, reranker
+
+
+@st.cache_resource
+def build_services(
+    cache_key: ServiceCacheKey,
+    session_namespace: str,
+    *,
+    _shared_services: tuple[OpenAIEmbeddingProvider, LanguageModel, FlashRankReranker],
+) -> AppServices:
+    """Create document storage and retrieval services isolated to one UI session."""
+
+    embeddings, language_model, reranker = _shared_services
+    vector_store = ChromaVectorStore(session_data_directory(VECTOR_DIRECTORY, session_namespace))
     return AppServices(
         ingestor=DocumentIngestor(
             embeddings=embeddings,
@@ -204,6 +218,10 @@ llm_provider = os.environ.get("LLM_PROVIDER", "openai").strip().lower()
 llm_model = os.environ.get("LLM_MODEL", "").strip()
 openai_api_key = os.environ["OPENAI_API_KEY"]
 gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
+session_namespace = cast(
+    str,
+    st.session_state.setdefault("session_namespace", uuid4().hex),
+)
 cache_key = ServiceCacheKey(
     llm_provider=llm_provider,
     llm_model=llm_model,
@@ -212,10 +230,15 @@ cache_key = ServiceCacheKey(
         api_key_fingerprint(gemini_api_key) if llm_provider == "gemini" else ""
     ),
 )
-services = build_services(
+shared_services = build_shared_services(
     cache_key,
     _openai_api_key=openai_api_key,
     _gemini_api_key=gemini_api_key,
+)
+services = build_services(
+    cache_key,
+    session_namespace,
+    _shared_services=shared_services,
 )
 messages = cast(list[ChatMessage], st.session_state.setdefault("messages", []))
 
@@ -233,7 +256,10 @@ with st.sidebar:
             path = save_uploaded_document(
                 filename=uploaded_file.name,
                 content=uploaded_file.getvalue(),
-                upload_directory=UPLOAD_DIRECTORY,
+                upload_directory=session_data_directory(
+                    UPLOAD_DIRECTORY,
+                    session_namespace,
+                ),
             )
             with st.spinner("Reading, chunking, and embedding…"):
                 result = services.ingestor.ingest(path)
