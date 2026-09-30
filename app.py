@@ -171,6 +171,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader(
         "Document",
         type=["pdf", "docx", "md", "txt"],
+        max_upload_size=250,
         label_visibility="collapsed",
     )
     if uploaded_file is not None and st.button("Ingest document", use_container_width=True):
