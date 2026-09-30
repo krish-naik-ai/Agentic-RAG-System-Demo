@@ -1,5 +1,6 @@
 chromadb==1.5.9
 flashrank==0.2.10
+numpy==2.2.6
 openai==3.19.0
 pydantic==2.13.5
 pypdf==6.19.0
