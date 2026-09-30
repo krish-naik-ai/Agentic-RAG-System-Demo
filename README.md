@@ -36,7 +36,8 @@ streamlit run app.py
 
 Upload a PDF, DOCX, Markdown, or text document from the sidebar, ingest it, and ask questions in the
 chat. Each answer reports latency and whether retrieval was used; source-backed responses expose
-their citation details. The application stores uploads and local Chroma data under ignored `data/`.
+their citation details. Uploads can be up to 250 MB per file. The application stores uploads and
+local Chroma data under ignored `data/`.
 
 ## Ingest documents programmatically
 
