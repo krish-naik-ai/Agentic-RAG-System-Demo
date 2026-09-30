@@ -1,7 +1,9 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from agentic_rag.ingestion_limits import DEFAULT_INGESTION_LIMITS
 from agentic_rag.loaders import UnsupportedDocumentError
 from agentic_rag.models import Citation
 from agentic_rag.ui import format_citation, save_uploaded_document, session_data_directory
@@ -48,6 +50,20 @@ def test_save_uploaded_document_rejects_empty_content(tmp_path: Path) -> None:
             content=b"",
             upload_directory=tmp_path,
         )
+
+
+def test_save_uploaded_document_rejects_oversized_content(tmp_path: Path) -> None:
+    limits = replace(DEFAULT_INGESTION_LIMITS, max_source_bytes=4)
+
+    with pytest.raises(ValueError, match="upload limit"):
+        save_uploaded_document(
+            filename="large.txt",
+            content=b"12345",
+            upload_directory=tmp_path,
+            limits=limits,
+        )
+
+    assert not (tmp_path / "large.txt").exists()
 
 
 def test_format_citation_includes_optional_page_and_score() -> None:

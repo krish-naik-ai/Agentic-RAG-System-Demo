@@ -14,6 +14,7 @@ from openai import APIError, OpenAI
 from agentic_rag.agent import RetrievalAgent
 from agentic_rag.embeddings import OpenAIEmbeddingProvider
 from agentic_rag.ingestion import DocumentIngestor
+from agentic_rag.ingestion_limits import DEFAULT_INGESTION_LIMITS
 from agentic_rag.llm import LanguageModel, create_language_model, required_api_keys
 from agentic_rag.models import AgentResponse
 from agentic_rag.reranking import FlashRankReranker
@@ -244,7 +245,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader(
         "Document",
         type=["pdf", "docx", "md", "txt"],
-        max_upload_size=250,
+        max_upload_size=DEFAULT_INGESTION_LIMITS.max_upload_mebibytes,
         label_visibility="collapsed",
     )
     if uploaded_file is not None and st.button("Ingest document", use_container_width=True):

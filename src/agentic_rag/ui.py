@@ -3,6 +3,11 @@
 import re
 from pathlib import Path
 
+from agentic_rag.ingestion_limits import (
+    DEFAULT_INGESTION_LIMITS,
+    IngestionLimitError,
+    IngestionLimits,
+)
 from agentic_rag.loaders import UnsupportedDocumentError
 from agentic_rag.models import Citation
 
@@ -23,6 +28,7 @@ def save_uploaded_document(
     filename: str,
     content: bytes,
     upload_directory: Path,
+    limits: IngestionLimits = DEFAULT_INGESTION_LIMITS,
 ) -> Path:
     """Validate and persist one uploaded document under its basename."""
 
@@ -34,6 +40,10 @@ def save_uploaded_document(
         raise UnsupportedDocumentError(f"Unsupported document type. Choose one of: {supported}")
     if not content:
         raise ValueError("The uploaded document is empty")
+    if len(content) > limits.max_source_bytes:
+        raise IngestionLimitError(
+            f"Document exceeds the {limits.max_upload_mebibytes} MB upload limit."
+        )
 
     upload_directory.mkdir(parents=True, exist_ok=True)
     path = upload_directory / safe_name
