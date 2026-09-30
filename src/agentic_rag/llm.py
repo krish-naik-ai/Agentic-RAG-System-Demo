@@ -31,10 +31,16 @@ class OpenAILanguageModel:
         self,
         *,
         model: str = "gpt-4.1-mini",
+        api_key: str | None = None,
         client: OpenAI | None = None,
     ) -> None:
         self._model = model
-        self._client = client or OpenAI()
+        if client is None:
+            key = api_key or os.environ.get("OPENAI_API_KEY")
+            if not key:
+                raise ValueError("Set OPENAI_API_KEY to use the OpenAI language model")
+            client = OpenAI(api_key=key)
+        self._client = client
 
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:
         response = self._client.responses.create(
@@ -75,9 +81,10 @@ class GeminiLanguageModel:
             ],
         )
         content = response.choices[0].message.content if response.choices else None
-        if content is None:
+        answer = content.strip() if content is not None else ""
+        if not answer:
             raise RuntimeError("Gemini returned an empty response")
-        return content.strip()
+        return answer
 
 
 def create_language_model(environ: Mapping[str, str] | None = None) -> LanguageModel:
@@ -87,11 +94,17 @@ def create_language_model(environ: Mapping[str, str] | None = None) -> LanguageM
     provider = env.get("LLM_PROVIDER", "openai").strip().lower()
     model = env.get("LLM_MODEL", "").strip()
     if provider == "openai":
-        return OpenAILanguageModel(model=model) if model else OpenAILanguageModel()
+        api_key = env.get("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("Set OPENAI_API_KEY to use the OpenAI language model")
+        return OpenAILanguageModel(model=model or "gpt-4.1-mini", api_key=api_key)
     if provider == "gemini":
+        api_key = env.get("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("Set GEMINI_API_KEY to use the Gemini language model")
         return GeminiLanguageModel(
             model=model or "gemini-2.5-flash",
-            api_key=env.get("GEMINI_API_KEY"),
+            api_key=api_key,
         )
     supported = ", ".join(SUPPORTED_PROVIDERS)
     raise ValueError(f"Unsupported LLM_PROVIDER {provider!r}. Choose one of: {supported}")

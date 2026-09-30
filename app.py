@@ -2,12 +2,13 @@
 
 import os
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from time import perf_counter
 from typing import Literal, TypedDict, cast
 
 import streamlit as st
-from openai import APIError
+from openai import APIError, OpenAI
 
 from agentic_rag.agent import RetrievalAgent
 from agentic_rag.embeddings import OpenAIEmbeddingProvider
@@ -31,6 +32,16 @@ class AppServices:
     vector_store: ChromaVectorStore
 
 
+@dataclass(frozen=True)
+class ServiceCacheKey:
+    """Configuration that determines reusable application services."""
+
+    llm_provider: str
+    llm_model: str
+    openai_key_fingerprint: str
+    gemini_key_fingerprint: str
+
+
 class ChatMessage(TypedDict):
     """Serializable message rendered in the chat timeline."""
 
@@ -42,11 +53,23 @@ class ChatMessage(TypedDict):
 
 
 @st.cache_resource
-def build_services() -> AppServices:
+def build_services(
+    cache_key: ServiceCacheKey,
+    *,
+    _openai_api_key: str,
+    _gemini_api_key: str,
+) -> AppServices:
     """Create shared embedding, language model, and local Chroma adapters."""
 
-    embeddings = OpenAIEmbeddingProvider()
-    language_model = create_language_model()
+    embeddings = OpenAIEmbeddingProvider(client=OpenAI(api_key=_openai_api_key))
+    language_model_environment = {
+        "LLM_PROVIDER": cache_key.llm_provider,
+        "LLM_MODEL": cache_key.llm_model,
+        "OPENAI_API_KEY": _openai_api_key,
+    }
+    if _gemini_api_key:
+        language_model_environment["GEMINI_API_KEY"] = _gemini_api_key
+    language_model = create_language_model(language_model_environment)
     vector_store = ChromaVectorStore(VECTOR_DIRECTORY)
     return AppServices(
         ingestor=DocumentIngestor(
@@ -60,6 +83,12 @@ def build_services() -> AppServices:
         ),
         vector_store=vector_store,
     )
+
+
+def api_key_fingerprint(api_key: str) -> str:
+    """Return a stable cache-safe identifier for an API key."""
+
+    return sha256(api_key.encode()).hexdigest()
 
 
 def render_answer(response: AgentResponse, latency_ms: float) -> None:
@@ -163,7 +192,23 @@ if missing_keys:
     st.error(f"Set {', '.join(missing_keys)} in the process environment before starting the app.")
     st.stop()
 
-services = build_services()
+llm_provider = os.environ.get("LLM_PROVIDER", "openai").strip().lower()
+llm_model = os.environ.get("LLM_MODEL", "").strip()
+openai_api_key = os.environ["OPENAI_API_KEY"]
+gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
+cache_key = ServiceCacheKey(
+    llm_provider=llm_provider,
+    llm_model=llm_model,
+    openai_key_fingerprint=api_key_fingerprint(openai_api_key),
+    gemini_key_fingerprint=(
+        api_key_fingerprint(gemini_api_key) if llm_provider == "gemini" else ""
+    ),
+)
+services = build_services(
+    cache_key,
+    _openai_api_key=openai_api_key,
+    _gemini_api_key=gemini_api_key,
+)
 messages = cast(list[ChatMessage], st.session_state.setdefault("messages", []))
 
 with st.sidebar:
