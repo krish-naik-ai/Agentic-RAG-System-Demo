@@ -70,6 +70,15 @@ response = agent.answer("What are the document's main recommendations?")
 print(response.answer)
 ```
 
+## Compare agentic and naive RAG
+
+The fixed evaluation ingests the included reference document, runs both systems over the same
+question set, and prints aggregate answer-quality, citation, and latency metrics.
+
+```bash
+python -m scripts.evaluate
+```
+
 ## Project layout
 
 ```text
