@@ -6,7 +6,7 @@ from agentic_rag.chunking import chunk_sections
 from agentic_rag.embeddings import EmbeddingProvider
 from agentic_rag.loaders import load_document
 from agentic_rag.models import IngestionResult
-from agentic_rag.vector_store import ChromaVectorStore
+from agentic_rag.vector_store import VectorStore
 
 
 class DocumentIngestor:
@@ -16,7 +16,7 @@ class DocumentIngestor:
         self,
         *,
         embeddings: EmbeddingProvider,
-        vector_store: ChromaVectorStore,
+        vector_store: VectorStore,
         chunk_size: int = 1_000,
         chunk_overlap: int = 150,
     ) -> None:
