@@ -55,6 +55,21 @@ result = ingestor.ingest(Path("example.pdf"))
 print(f"Stored {result.chunk_count} chunks")
 ```
 
+## Ask cited questions programmatically
+
+```python
+from agentic_rag.agent import RetrievalAgent
+from agentic_rag.llm import OpenAILanguageModel
+
+agent = RetrievalAgent(
+    language_model=OpenAILanguageModel(),
+    embeddings=OpenAIEmbeddingProvider(),
+    vector_store=store,
+)
+response = agent.answer("What are the document's main recommendations?")
+print(response.answer)
+```
+
 ## Project layout
 
 ```text

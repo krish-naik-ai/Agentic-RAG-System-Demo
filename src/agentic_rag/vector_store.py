@@ -1,13 +1,26 @@
 """Persistent local Chroma vector storage."""
 
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 
 import chromadb
 from chromadb.api.models.Collection import Collection
 from chromadb.api.types import Metadata, PyEmbeddings
 
 from agentic_rag.models import DocumentChunk, RetrievedChunk
+
+
+class VectorStore(Protocol):
+    """Storage operations used by ingestion and retrieval."""
+
+    def replace(self, chunks: list[DocumentChunk], embeddings: list[list[float]]) -> None:
+        """Replace chunks belonging to the supplied sources."""
+
+    def query(self, embedding: list[float], *, limit: int = 5) -> list[RetrievedChunk]:
+        """Return the most similar chunks."""
+
+    def count(self) -> int:
+        """Return the number of stored chunks."""
 
 
 class ChromaVectorStore:
