@@ -37,6 +37,24 @@ streamlit run app.py
 The Streamlit entrypoint is added in the UI slice. The application stores local runtime data under
 `data/`; that directory is ignored by Git.
 
+## Ingest documents programmatically
+
+```python
+from pathlib import Path
+
+from agentic_rag.embeddings import OpenAIEmbeddingProvider
+from agentic_rag.ingestion import DocumentIngestor
+from agentic_rag.vector_store import ChromaVectorStore
+
+store = ChromaVectorStore(Path("data/chroma"))
+ingestor = DocumentIngestor(
+    embeddings=OpenAIEmbeddingProvider(),
+    vector_store=store,
+)
+result = ingestor.ingest(Path("example.pdf"))
+print(f"Stored {result.chunk_count} chunks")
+```
+
 ## Project layout
 
 ```text

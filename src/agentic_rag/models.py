@@ -33,3 +33,12 @@ class IngestionResult(BaseModel):
     source: str
     section_count: int = Field(ge=0)
     chunk_count: int = Field(ge=0)
+
+
+class RetrievedChunk(BaseModel):
+    """A stored chunk returned by vector similarity search."""
+
+    model_config = ConfigDict(frozen=True)
+
+    chunk: DocumentChunk
+    score: float
