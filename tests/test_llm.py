@@ -80,8 +80,9 @@ def test_gemini_model_sends_system_and_user_messages() -> None:
     ]
 
 
-def test_gemini_model_rejects_empty_response() -> None:
-    model = GeminiLanguageModel(client=fake_client(RecordingCompletions(None)))
+@pytest.mark.parametrize("content", [None, "   "])
+def test_gemini_model_rejects_empty_response(content: str | None) -> None:
+    model = GeminiLanguageModel(client=fake_client(RecordingCompletions(content)))
 
     with pytest.raises(RuntimeError, match="empty response"):
         model.complete(system_prompt="system", user_prompt="user")
@@ -110,7 +111,7 @@ def test_gemini_client_targets_openai_compatible_endpoint() -> None:
 def test_factory_defaults_to_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
-    assert isinstance(create_language_model({}), OpenAILanguageModel)
+    assert isinstance(create_language_model(), OpenAILanguageModel)
 
 
 def test_factory_builds_gemini_from_environment() -> None:
@@ -119,6 +120,15 @@ def test_factory_builds_gemini_from_environment() -> None:
     )
 
     assert isinstance(model, GeminiLanguageModel)
+
+
+def test_factory_does_not_fall_back_to_process_gemini_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "host-key")
+
+    with pytest.raises(ValueError, match="GEMINI_API_KEY"):
+        create_language_model({"LLM_PROVIDER": "gemini"})
 
 
 def test_factory_rejects_unknown_provider() -> None:
