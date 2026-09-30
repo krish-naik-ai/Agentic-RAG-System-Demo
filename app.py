@@ -12,7 +12,7 @@ from openai import APIError
 from agentic_rag.agent import RetrievalAgent
 from agentic_rag.embeddings import OpenAIEmbeddingProvider
 from agentic_rag.ingestion import DocumentIngestor
-from agentic_rag.llm import OpenAILanguageModel
+from agentic_rag.llm import create_language_model, required_api_keys
 from agentic_rag.models import AgentResponse
 from agentic_rag.ui import format_citation, save_uploaded_document
 from agentic_rag.vector_store import ChromaVectorStore
@@ -43,10 +43,10 @@ class ChatMessage(TypedDict):
 
 @st.cache_resource
 def build_services() -> AppServices:
-    """Create shared OpenAI and local Chroma adapters."""
+    """Create shared embedding, language model, and local Chroma adapters."""
 
     embeddings = OpenAIEmbeddingProvider()
-    language_model = OpenAILanguageModel()
+    language_model = create_language_model()
     vector_store = ChromaVectorStore(VECTOR_DIRECTORY)
     return AppServices(
         ingestor=DocumentIngestor(
@@ -158,8 +158,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-if not os.environ.get("OPENAI_API_KEY"):
-    st.error("Set OPENAI_API_KEY in the process environment before starting the app.")
+missing_keys = [key for key in required_api_keys() if not os.environ.get(key)]
+if missing_keys:
+    st.error(f"Set {', '.join(missing_keys)} in the process environment before starting the app.")
     st.stop()
 
 services = build_services()

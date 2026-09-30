@@ -6,7 +6,10 @@ storage, an agent that plans retrieval, cited answers, comparative evaluation, a
 ## Requirements
 
 - Python 3.10+
-- `OPENAI_API_KEY` in the process environment for live embeddings and answers
+- `OPENAI_API_KEY` in the process environment for live embeddings (always) and OpenAI answers
+- Optional: `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` to generate answers with Gemini while
+  keeping OpenAI embeddings. `LLM_MODEL` selects `gemini-2.5-flash` (default) or
+  `gemini-3.5-flash`.
 
 ## Install
 
