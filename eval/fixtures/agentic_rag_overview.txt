@@ -1,0 +1,12 @@
+The Agentic RAG demo uses a retrieval planner before searching. The planner decides whether
+retrieval is necessary for the user's request and writes a concise, standalone search query.
+Conversational messages can bypass retrieval.
+
+Documents are split into overlapping source chunks and embedded with an OpenAI embedding model.
+The vectors and source metadata are stored locally in Chroma. Re-ingesting a source replaces its
+older chunks.
+
+When retrieval is used, the answer generator receives labeled source chunks. Generated factual
+claims include citations such as [S1], making the answer auditable against the original source
+chunks. If no relevant evidence is found, the system reports that limitation instead of inventing
+an answer.

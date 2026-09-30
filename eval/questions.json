@@ -1,0 +1,14 @@
+[
+  {
+    "question": "What two choices does the retrieval planner make?",
+    "expected_terms": ["retrieval is necessary", "search query"]
+  },
+  {
+    "question": "How does the system make generated answers auditable?",
+    "expected_terms": ["citations", "source chunks"]
+  },
+  {
+    "question": "Which local vector store does this demo use?",
+    "expected_terms": ["chroma"]
+  }
+]
