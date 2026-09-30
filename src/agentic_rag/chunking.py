@@ -2,6 +2,7 @@
 
 from hashlib import sha256
 
+from agentic_rag.ingestion_limits import IngestionLimitError
 from agentic_rag.models import DocumentChunk, LoadedSection
 
 
@@ -10,6 +11,7 @@ def chunk_sections(
     *,
     chunk_size: int = 1_000,
     chunk_overlap: int = 150,
+    max_chunks: int | None = None,
 ) -> list[DocumentChunk]:
     """Split loaded sections into overlapping chunks with stable identifiers."""
 
@@ -17,6 +19,8 @@ def chunk_sections(
         raise ValueError("chunk_size must be positive")
     if chunk_overlap < 0 or chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be non-negative and smaller than chunk_size")
+    if max_chunks is not None and max_chunks <= 0:
+        raise ValueError("max_chunks must be positive")
 
     chunks: list[DocumentChunk] = []
     for section in sections:
@@ -47,6 +51,11 @@ def chunk_sections(
                         chunk_index=chunk_index,
                     )
                 )
+                if max_chunks is not None and len(chunks) > max_chunks:
+                    raise IngestionLimitError(
+                        f"Document would create more than {max_chunks} chunks. "
+                        "Upload a smaller document."
+                    )
 
             if end == len(normalized):
                 break
