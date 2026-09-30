@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from pathlib import Path
+from threading import Lock
 from typing import Protocol, TypedDict, cast
 
 from flashrank import Ranker, RerankRequest  # type: ignore[import-untyped]
@@ -29,6 +30,11 @@ class _RankedPassage(TypedDict):
     text: str
 
 
+class _RankerBackend(Protocol):
+    def rerank(self, request: object) -> list[_RankedPassage]:
+        """Score and order passages for one query."""
+
+
 class FlashRankReranker:
     """Runs a lightweight FlashRank cross-encoder locally on CPU."""
 
@@ -41,11 +47,11 @@ class FlashRankReranker:
     ) -> None:
         if max_length <= 0:
             raise ValueError("max_length must be positive")
-        self._ranker = Ranker(
-            model_name=model_name,
-            cache_dir=str(cache_dir),
-            max_length=max_length,
-        )
+        self._model_name = model_name
+        self._cache_dir = cache_dir
+        self._max_length = max_length
+        self._ranker: _RankerBackend | None = None
+        self._ranker_lock = Lock()
 
     def rerank(
         self,
@@ -71,10 +77,7 @@ class FlashRankReranker:
             }
             for index, hit in enumerate(hits)
         ]
-        result = cast(
-            list[_RankedPassage],
-            self._ranker.rerank(RerankRequest(query=query, passages=passages)),
-        )
+        result = self._get_ranker().rerank(RerankRequest(query=query, passages=passages))
 
         reranked: list[RetrievedChunk] = []
         seen_indices: set[int] = set()
@@ -87,3 +90,27 @@ class FlashRankReranker:
             if len(reranked) == limit:
                 break
         return reranked
+
+    def _get_ranker(self) -> _RankerBackend:
+        ranker = self._ranker
+        if ranker is not None:
+            return ranker
+
+        with self._ranker_lock:
+            ranker = self._ranker
+            if ranker is None:
+                try:
+                    ranker = cast(
+                        _RankerBackend,
+                        Ranker(
+                            model_name=self._model_name,
+                            cache_dir=str(self._cache_dir),
+                            max_length=self._max_length,
+                        ),
+                    )
+                except Exception as error:
+                    raise RuntimeError(
+                        f"Unable to load reranking model {self._model_name!r}: {error}"
+                    ) from error
+                self._ranker = ranker
+        return ranker

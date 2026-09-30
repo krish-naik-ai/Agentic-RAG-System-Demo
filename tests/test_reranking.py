@@ -47,6 +47,8 @@ def test_flashrank_adapter_preserves_hits_in_model_order(
         model_name="test-model",
         max_length=256,
     )
+    assert initializations == []
+
     first = _hit("chunk-1", "Initial vector match.", 0.91)
     second = _hit("chunk-2", "Stronger semantic match.", 0.83)
 
@@ -66,9 +68,12 @@ def test_flashrank_adapter_rejects_invalid_inputs(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    initializations = 0
+
     class FakeRanker:
         def __init__(self, *, model_name: str, cache_dir: str, max_length: int) -> None:
-            pass
+            nonlocal initializations
+            initializations += 1
 
         def rerank(self, request: object) -> list[dict[str, object]]:
             return []
@@ -80,3 +85,23 @@ def test_flashrank_adapter_rejects_invalid_inputs(
         reranker.rerank(" ", [], limit=1)
     with pytest.raises(ValueError, match="limit must be positive"):
         reranker.rerank("query", [], limit=0)
+    assert reranker.rerank("query", [], limit=1) == []
+    assert initializations == 0
+
+
+def test_flashrank_adapter_reports_model_load_failure_at_rerank_time(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingRanker:
+        def __init__(self, *, model_name: str, cache_dir: str, max_length: int) -> None:
+            raise OSError("model host unavailable")
+
+    monkeypatch.setattr(reranking, "Ranker", FailingRanker)
+    reranker = FlashRankReranker(tmp_path, model_name="unavailable-model")
+
+    with pytest.raises(
+        RuntimeError,
+        match="Unable to load reranking model 'unavailable-model': model host unavailable",
+    ):
+        reranker.rerank("query", [_hit("chunk-1", "Relevant text.", 0.9)], limit=1)
