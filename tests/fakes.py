@@ -29,6 +29,27 @@ class ScriptedLanguageModel:
         return next(self._responses)
 
 
+class ReverseReranker:
+    """Reverses candidates to make reranking effects visible in tests."""
+
+    def __init__(self) -> None:
+        self.last_query: str | None = None
+        self.last_hits: list[RetrievedChunk] = []
+        self.last_limit: int | None = None
+
+    def rerank(
+        self,
+        query: str,
+        hits: Sequence[RetrievedChunk],
+        *,
+        limit: int,
+    ) -> list[RetrievedChunk]:
+        self.last_query = query
+        self.last_hits = list(hits)
+        self.last_limit = limit
+        return list(reversed(hits))[:limit]
+
+
 class StubVectorStore:
     """In-memory vector-store test double."""
 
