@@ -9,7 +9,7 @@ from agentic_rag.baselines import NaiveRAG
 from agentic_rag.embeddings import OpenAIEmbeddingProvider
 from agentic_rag.evaluation import EvaluationCase, compare_systems, render_comparison_table
 from agentic_rag.ingestion import DocumentIngestor
-from agentic_rag.llm import OpenAILanguageModel
+from agentic_rag.llm import create_language_model
 from agentic_rag.reranking import FlashRankReranker
 from agentic_rag.vector_store import ChromaVectorStore
 
@@ -24,7 +24,7 @@ def main() -> None:
         collection_name="agentic-rag-evaluation",
     )
     embeddings = OpenAIEmbeddingProvider()
-    language_model = OpenAILanguageModel()
+    language_model = create_language_model()
     reranker = FlashRankReranker(root / "data" / "models")
     ingestor = DocumentIngestor(embeddings=embeddings, vector_store=vector_store)
     ingestor.ingest(root / "eval" / "fixtures" / "agentic_rag_overview.txt")

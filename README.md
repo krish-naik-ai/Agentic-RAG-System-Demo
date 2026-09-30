@@ -7,7 +7,10 @@ comparative evaluation, and a Streamlit UI.
 ## Requirements
 
 - Python 3.10+
-- `OPENAI_API_KEY` in the process environment for live embeddings and answers
+- `OPENAI_API_KEY` in the process environment for live embeddings (always) and OpenAI answers
+- Optional: `LLM_PROVIDER=gemini` and `GEMINI_API_KEY` to generate answers with Gemini while
+  keeping OpenAI embeddings. `LLM_MODEL` selects `gemini-2.5-flash` (default) or
+  `gemini-3.5-flash`.
 
 ## Install
 
@@ -37,7 +40,8 @@ streamlit run app.py
 
 Upload a PDF, DOCX, Markdown, or text document from the sidebar, ingest it, and ask questions in the
 chat. Each answer reports latency and whether retrieval was used; source-backed responses expose
-their citation details. The application stores uploads and local Chroma data under ignored `data/`.
+their citation details. Uploads can be up to 250 MB per file. The application stores uploads and
+local Chroma data under ignored `data/`.
 
 ## Ingest documents programmatically
 
