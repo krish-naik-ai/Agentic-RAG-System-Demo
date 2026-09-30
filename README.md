@@ -1,7 +1,8 @@
 # Agentic RAG System Demo
 
 An end-to-end retrieval-augmented generation application with document ingestion, local Chroma
-storage, an agent that plans retrieval, cited answers, comparative evaluation, and a Streamlit UI.
+storage, an agent that plans retrieval, open-source cross-encoder reranking, cited answers,
+comparative evaluation, and a Streamlit UI.
 
 ## Requirements
 
@@ -61,15 +62,21 @@ print(f"Stored {result.chunk_count} chunks")
 ```python
 from agentic_rag.agent import RetrievalAgent
 from agentic_rag.llm import OpenAILanguageModel
+from agentic_rag.reranking import FlashRankReranker
 
 agent = RetrievalAgent(
     language_model=OpenAILanguageModel(),
     embeddings=OpenAIEmbeddingProvider(),
     vector_store=store,
+    reranker=FlashRankReranker(Path("data/models")),
 )
 response = agent.answer("What are the document's main recommendations?")
 print(response.answer)
 ```
+
+The agent retrieves up to 20 vector-search candidates, removes weak matches, and reranks the
+remaining chunks before sending the best five to the answer model. FlashRank runs the open-source
+`ms-marco-TinyBERT-L-2-v2` cross-encoder locally on CPU and caches it under ignored `data/`.
 
 ## Compare agentic and naive RAG
 

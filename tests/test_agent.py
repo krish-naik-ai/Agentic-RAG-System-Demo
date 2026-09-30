@@ -2,7 +2,12 @@ import pytest
 
 from agentic_rag.agent import AgentDecisionError, RetrievalAgent
 from agentic_rag.models import DocumentChunk, RetrievedChunk
-from tests.fakes import KeywordEmbeddingProvider, ScriptedLanguageModel, StubVectorStore
+from tests.fakes import (
+    KeywordEmbeddingProvider,
+    ReverseReranker,
+    ScriptedLanguageModel,
+    StubVectorStore,
+)
 
 
 def _retrieval_hit() -> RetrievedChunk:
@@ -42,6 +47,55 @@ def test_plans_retrieval_and_returns_cited_answer() -> None:
     assert "[S1]" in response.answer
     assert vector_store.last_limit == 3
     assert "[S1] guide.pdf, page 3" in language_model.prompts[1][1]
+
+
+def test_reranks_a_wider_candidate_set_before_generation() -> None:
+    hits = [
+        _retrieval_hit(),
+        RetrievedChunk(
+            chunk=DocumentChunk(
+                chunk_id="chunk-2",
+                text="Vector retrieval finds an initial candidate set.",
+                source="retrieval.txt",
+                chunk_index=0,
+            ),
+            score=0.88,
+        ),
+        RetrievedChunk(
+            chunk=DocumentChunk(
+                chunk_id="chunk-3",
+                text="A cross-encoder reranks candidates before generation.",
+                source="reranking.txt",
+                chunk_index=0,
+            ),
+            score=0.82,
+        ),
+    ]
+    language_model = ScriptedLanguageModel(
+        [
+            '{"needs_retrieval": true, "query": "reranking pipeline"}',
+            "The cross-encoder reranks the candidate set [S1].",
+        ]
+    )
+    vector_store = StubVectorStore(hits)
+    reranker = ReverseReranker()
+    agent = RetrievalAgent(
+        language_model=language_model,
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=vector_store,
+        reranker=reranker,
+        retrieval_limit=2,
+        reranking_candidate_limit=4,
+    )
+
+    response = agent.answer("What happens after vector retrieval?")
+
+    assert vector_store.last_limit == 4
+    assert reranker.last_query == "reranking pipeline"
+    assert reranker.last_hits == hits
+    assert reranker.last_limit == 2
+    assert [citation.chunk_id for citation in response.citations] == ["chunk-3", "chunk-2"]
+    assert "[S1] reranking.txt" in language_model.prompts[1][1]
 
 
 def test_skips_retrieval_for_conversational_question() -> None:
@@ -146,3 +200,15 @@ def test_rejects_invalid_planner_output() -> None:
 
     with pytest.raises(AgentDecisionError, match="invalid JSON"):
         agent.answer("Summarize the document")
+
+
+def test_rejects_candidate_limit_smaller_than_answer_limit() -> None:
+    with pytest.raises(ValueError, match="at least retrieval_limit"):
+        RetrievalAgent(
+            language_model=ScriptedLanguageModel([]),
+            embeddings=KeywordEmbeddingProvider(),
+            vector_store=StubVectorStore([]),
+            reranker=ReverseReranker(),
+            retrieval_limit=5,
+            reranking_candidate_limit=4,
+        )

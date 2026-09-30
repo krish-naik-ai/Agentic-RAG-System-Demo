@@ -13,6 +13,7 @@ from agentic_rag.generation import (
 )
 from agentic_rag.llm import LanguageModel
 from agentic_rag.models import AgentResponse, RetrievalPlan
+from agentic_rag.reranking import Reranker
 from agentic_rag.vector_store import VectorStore
 
 _PLANNER_SYSTEM_PROMPT = """You are a retrieval planner for a document question-answering app.
@@ -39,17 +40,23 @@ class RetrievalAgent:
         language_model: LanguageModel,
         embeddings: EmbeddingProvider,
         vector_store: VectorStore,
+        reranker: Reranker | None = None,
         retrieval_limit: int = 5,
+        reranking_candidate_limit: int = 20,
         minimum_relevance: float = 0.2,
     ) -> None:
         if retrieval_limit <= 0:
             raise ValueError("retrieval_limit must be positive")
+        if reranker is not None and reranking_candidate_limit < retrieval_limit:
+            raise ValueError("reranking_candidate_limit must be at least retrieval_limit")
         if not -1.0 <= minimum_relevance <= 1.0:
             raise ValueError("minimum_relevance must be between -1 and 1")
         self._language_model = language_model
         self._embeddings = embeddings
         self._vector_store = vector_store
+        self._reranker = reranker
         self._retrieval_limit = retrieval_limit
+        self._reranking_candidate_limit = reranking_candidate_limit
         self._minimum_relevance = minimum_relevance
 
     def answer(self, question: str) -> AgentResponse:
@@ -74,10 +81,17 @@ class RetrievalAgent:
         query_vectors = self._embeddings.embed([query])
         if len(query_vectors) != 1:
             raise ValueError("The embedding provider must return one query embedding")
+        candidate_limit = (
+            self._reranking_candidate_limit if self._reranker is not None else self._retrieval_limit
+        )
         hits = filter_relevant_hits(
-            self._vector_store.query(query_vectors[0], limit=self._retrieval_limit),
+            self._vector_store.query(query_vectors[0], limit=candidate_limit),
             minimum_relevance=self._minimum_relevance,
         )
+        if self._reranker is not None:
+            hits = self._reranker.rerank(query, hits, limit=self._retrieval_limit)
+        else:
+            hits = hits[: self._retrieval_limit]
         if not hits:
             return AgentResponse(
                 answer="I could not find relevant evidence in the uploaded documents.",

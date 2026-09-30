@@ -14,12 +14,14 @@ from agentic_rag.embeddings import OpenAIEmbeddingProvider
 from agentic_rag.ingestion import DocumentIngestor
 from agentic_rag.llm import OpenAILanguageModel
 from agentic_rag.models import AgentResponse
+from agentic_rag.reranking import FlashRankReranker
 from agentic_rag.ui import format_citation, save_uploaded_document
 from agentic_rag.vector_store import ChromaVectorStore
 
 DATA_DIRECTORY = Path("data")
 UPLOAD_DIRECTORY = DATA_DIRECTORY / "uploads"
 VECTOR_DIRECTORY = DATA_DIRECTORY / "chroma"
+MODEL_DIRECTORY = DATA_DIRECTORY / "models"
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,7 @@ def build_services() -> AppServices:
     embeddings = OpenAIEmbeddingProvider()
     language_model = OpenAILanguageModel()
     vector_store = ChromaVectorStore(VECTOR_DIRECTORY)
+    reranker = FlashRankReranker(MODEL_DIRECTORY)
     return AppServices(
         ingestor=DocumentIngestor(
             embeddings=embeddings,
@@ -57,6 +60,7 @@ def build_services() -> AppServices:
             language_model=language_model,
             embeddings=embeddings,
             vector_store=vector_store,
+            reranker=reranker,
         ),
         vector_store=vector_store,
     )
