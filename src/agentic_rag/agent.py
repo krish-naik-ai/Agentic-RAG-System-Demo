@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from agentic_rag.embeddings import EmbeddingProvider
 from agentic_rag.generation import (
     ANSWER_SYSTEM_PROMPT,
+    CONVERSATION_SYSTEM_PROMPT,
     build_answer_prompt,
     citations_from_hits,
     ensure_citation_labels,
@@ -72,7 +73,7 @@ class RetrievalAgent:
         plan = self._plan(question)
         if not plan.needs_retrieval:
             answer = self._language_model.complete(
-                system_prompt=ANSWER_SYSTEM_PROMPT,
+                system_prompt=CONVERSATION_SYSTEM_PROMPT,
                 user_prompt=question,
             )
             return AgentResponse(

@@ -57,6 +57,29 @@ def test_plans_retrieval_and_returns_cited_answer() -> None:
     }
 
 
+def test_accepts_structured_grounded_answer_and_renders_validated_labels() -> None:
+    language_model = ScriptedLanguageModel(
+        [
+            '{"needs_retrieval": true, "query": "Polaris operations"}',
+            (
+                '{"answer": "The launch window is 06:40 UTC and the call sign is '
+                'NORTHSTAR.", "citation_labels": ["S1"]}'
+            ),
+        ]
+    )
+    agent = RetrievalAgent(
+        language_model=language_model,
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=StubVectorStore([_retrieval_hit()]),
+    )
+
+    response = agent.answer("What are the launch window and call sign?")
+
+    assert response.answer == (
+        "The launch window is 06:40 UTC and the call sign is NORTHSTAR.\n\nSources: [S1]"
+    )
+
+
 def test_reranks_a_wider_candidate_set_before_generation() -> None:
     hits = [
         _retrieval_hit(),
@@ -191,6 +214,25 @@ def test_rejects_answer_with_fabricated_source_label() -> None:
         "I could not produce a citation-valid answer from the retrieved evidence.\n\n"
         "Sources reviewed: [S1]"
     )
+    assert "[S999]" not in response.answer
+
+
+def test_rejects_structured_answer_with_fabricated_source_label() -> None:
+    language_model = ScriptedLanguageModel(
+        [
+            '{"needs_retrieval": true, "query": "agentic retrieval"}',
+            '{"answer": "Unsupported claim.", "citation_labels": ["S999"]}',
+        ]
+    )
+    agent = RetrievalAgent(
+        language_model=language_model,
+        embeddings=KeywordEmbeddingProvider(),
+        vector_store=StubVectorStore([_retrieval_hit()]),
+    )
+
+    response = agent.answer("How does retrieval work?")
+
+    assert "citation-valid answer" in response.answer
     assert "[S999]" not in response.answer
 
 
