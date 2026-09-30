@@ -28,14 +28,15 @@ python -m mypy
 python -m pytest
 ```
 
-## Run the completed application
+## Run the application
 
 ```bash
 streamlit run app.py
 ```
 
-The Streamlit entrypoint is added in the UI slice. The application stores local runtime data under
-`data/`; that directory is ignored by Git.
+Upload a PDF, DOCX, Markdown, or text document from the sidebar, ingest it, and ask questions in the
+chat. Each answer reports latency and whether retrieval was used; source-backed responses expose
+their citation details. The application stores uploads and local Chroma data under ignored `data/`.
 
 ## Ingest documents programmatically
 
